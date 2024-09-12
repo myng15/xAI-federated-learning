@@ -197,14 +197,21 @@ class TestArgumentsManager(ArgumentsManager):
             type=str
         )
         self.parser.add_argument(
-            'chkpts_path',
+            '--chkpts_path',
             help='path to checkpoints file;',
-            type=str
+            type=str,
+            default=""
         )
         self.parser.add_argument(
-            "n_neighbors",
+            "--n_neighbors",
             help="number of neighbours used in nearest neighbours retrieval;",
             type=int
+        )
+        self.parser.add_argument(
+            "--n_clusters",
+            help="number of k_means clusters;",
+            type=int,
+            default=0
         )
         self.parser.add_argument(
             '--interpolate_logits',
@@ -257,3 +264,40 @@ class TestArgumentsManager(ArgumentsManager):
         return args_string
 
 
+class PlotsArgumentsManager(ArgumentsManager):
+    def __init__(self):
+        super(PlotsArgumentsManager, self).__init__()
+
+        self.parser = argparse.ArgumentParser(description=__doc__)
+        self.args = None
+        self.initialized = False
+
+        self.parser.add_argument(
+            'plot_name',
+            help='name of the plot, possible are:'
+                 '{"capacity_effect", "weight_effect", "hetero_effect", "n_neighbors_effect"}'
+        )
+        self.parser.add_argument(
+            '--results_dir',
+            help='directory to the results; should contain files `all_scores.npy`, `capacities_grid.npy`,'
+                 '`weights_grid.npy` abd `capacities_grid.npy`;',
+            type=str
+        )
+        self.parser.add_argument(
+            '--save_path',
+            help='path to save the plots',
+            type=str
+        )
+
+    def args_to_string(self):
+        pass
+
+    def parse_arguments(self, args_list=None):
+        if args_list:
+            args = self.parser.parse_args(args_list)
+        else:
+            args = self.parser.parse_args()
+
+        self.args = args
+
+        self.initialized = True

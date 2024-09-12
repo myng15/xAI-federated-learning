@@ -104,7 +104,7 @@ class SubCIFAR10(Dataset):
             # Convert input embeddings/targets from NumPy arrays to PyTorch tensors
             if cifar10_data is not None and cifar10_targets is not None:
                 self.data = torch.tensor(cifar10_data, dtype=torch.float32)  
-                self.targets = torch.tensor(cifar10_targets, dtype=torch.long)  
+                self.targets = torch.tensor(cifar10_targets, dtype=torch.int64)  
             else:
                 # Load the data from the path if not provided (this part is based on your original implementation)
                 raise NotImplementedError("Loading from file path is not implemented in this example.")
@@ -181,7 +181,7 @@ class SubCIFAR100(Dataset):
         # Convert NumPy arrays to PyTorch tensors
         if cifar100_data is not None and cifar100_targets is not None:
             self.data = torch.tensor(cifar100_data, dtype=torch.float32)  
-            self.targets = torch.tensor(cifar100_targets, dtype=torch.long)  
+            self.targets = torch.tensor(cifar100_targets, dtype=torch.int64)  
         else:
             # Load the data from the path if not provided (this part is based on your original implementation)
             raise NotImplementedError("Loading from file path is not implemented in this example.")

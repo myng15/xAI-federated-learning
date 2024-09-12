@@ -367,6 +367,24 @@ class CentralizedAggregator(Aggregator):
         self.global_learner.model.load_state_dict(torch.load(chkpts_path))
 
 
+class ClusterCentroidsAggregator:
+    def __init__(self, num_clients, features_dimension):
+        self.num_clients = num_clients
+        self.global_centroids = []
+        self.global_labels = []
+        self.features_dimension = features_dimension
+
+    def aggregate_centroids(self, all_centroids, all_labels):
+        # Store all received centroids and labels
+        self.global_centroids = np.vstack(all_centroids)
+        self.global_labels = np.concatenate(all_labels)
+
+    def send_relevant_centroids(self, client_labels):
+        # Send back centroids relevant to the client's local labels
+        relevant_indices = [i for i, label in enumerate(self.global_labels) if label in client_labels]
+        return self.global_centroids[relevant_indices], self.global_labels[relevant_indices]
+    
+
 class NoCommunicationAggregator(Aggregator):
     r"""Clients do not communicate. Each client work locally
 
@@ -381,3 +399,4 @@ class NoCommunicationAggregator(Aggregator):
 
     def toggle_client(self, client_id, mode):
         pass
+

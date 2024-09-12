@@ -5,10 +5,10 @@ import pickle
 import numpy as np
 
 from sklearn.model_selection import train_test_split
-from .utils_data import by_labels_non_iid_split, pathological_non_iid_split, iid_split
+from data.cifar10.utils_data import by_labels_non_iid_split, pathological_non_iid_split, iid_split
 
-RAW_DATA_PATH = "database/" 
-PATH = "all_clients_data/"
+RAW_DATA_PATH = "data/cifar10/database/" 
+PATH = "data/cifar10/all_clients_data/"
 N_CLASSES = 10
 
 

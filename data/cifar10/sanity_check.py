@@ -3,8 +3,8 @@ import pickle
 import random
 import numpy as np
 
-RAW_DATA_PATH = "./data/databases/cifar10/"
-DATA_PATH = "./all_clients_data/"
+RAW_DATA_PATH = "./data/cifar10/database/"
+DATA_PATH = "./data/cifar10/all_clients_data/"
 TRAIN_PATH = os.path.join(DATA_PATH, "train")
 TEST_PATH = os.path.join(DATA_PATH, "test")
 
