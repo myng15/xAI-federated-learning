@@ -152,7 +152,7 @@ class SubCIFAR100(Dataset):
     __getitem__
 
     """
-    def __init__(self, path, cifar100_data=None, cifar100_targets=None, transform=None):
+    def __init__(self, path, aggregator_, cifar100_data=None, cifar100_targets=None, transform=None):
         """
         :param path: path to .pkl file; expected to store list of indices:
         :param cifar100_data: CIFAR-100 dataset inputs
@@ -172,19 +172,22 @@ class SubCIFAR100(Dataset):
                         (0.2023, 0.1994, 0.2010)
                     )
                 ])
+        
+        self.aggregator_ = aggregator_
 
-        # if cifar100_data is None or cifar100_targets is None:
-        #     self.data, self.targets = get_cifar100()
-        # else:
-        #     self.data, self.targets = cifar100_data, cifar100_targets
-
-        # Convert NumPy arrays to PyTorch tensors
-        if cifar100_data is not None and cifar100_targets is not None:
-            self.data = torch.tensor(cifar100_data, dtype=torch.float32)  
-            self.targets = torch.tensor(cifar100_targets, dtype=torch.int64)  
+        if self.aggregator_ == "centralized":
+            if cifar100_data is None or cifar100_targets is None:
+                self.data, self.targets = get_cifar100()
+            else:
+                self.data, self.targets = cifar100_data, cifar100_targets
         else:
-            # Load the data from the path if not provided (this part is based on your original implementation)
-            raise NotImplementedError("Loading from file path is not implemented in this example.")
+            # Convert input embeddings/targets from NumPy arrays to PyTorch tensors
+            if cifar100_data is not None and cifar100_targets is not None:
+                self.data = torch.tensor(cifar100_data, dtype=torch.float32)  
+                self.targets = torch.tensor(cifar100_targets, dtype=torch.int64)  
+            else:
+                # Load the data from the path if not provided (this part is based on your original implementation)
+                raise NotImplementedError("Loading from file path is not implemented in this example.")
 
         self.data = self.data[self.indices]
         self.targets = self.targets[self.indices]
@@ -193,16 +196,21 @@ class SubCIFAR100(Dataset):
         return self.data.size(0)
 
     def __getitem__(self, index):
-        img, target = self.data[index], self.targets[index]
+        if self.aggregator_ == "centralized":
+            img, target = self.data[index], self.targets[index]
 
-        img = Image.fromarray(img.numpy())
+            img = Image.fromarray(img.numpy())
 
-        if self.transform is not None:
-            img = self.transform(img)
+            if self.transform is not None:
+                img = self.transform(img)
 
-        target = target
+            target = target
 
-        return img, target, index
+            return img, target, index
+        
+        else:
+            # Directly return the data (embedding) and the corresponding target
+            return self.data[index], self.targets[index], index
     
 
 def get_cifar10():

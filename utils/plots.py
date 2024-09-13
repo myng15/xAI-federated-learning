@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 
 ALPHAS = ["0.1", "0.3", "0.5", "0.7", "1.0"]
 
+def round_to_nearest(value, base=50):
+    return round(value / base) * base
+
 # TODO: Check if this plot makes sense
 def plot_capacity_effect(ax, results_dir, save_path=None, label=None):
     """plot the effect of the interpolation parameter on the test accuracy
@@ -92,7 +95,7 @@ def plot_weight_effect(results_dir, save_path=None):
         weights_grid,
         100 * accuracies,
         linewidth=5.0,
-        label=fr"$\bar{{n}}_{{m}} \approx {int(round(average_n_train_samples * capacities_grid[round(len(capacities_grid)*0.25)], -2))}$"
+        label=fr"$\bar{{n}}_{{m}} \approx {int(round_to_nearest(average_n_train_samples * capacities_grid[round(len(capacities_grid)*0.25)]))}$"
     )
 
     accuracies = average_scores[:, round(len(capacities_grid)*0.5)] #[:, 10]
@@ -101,7 +104,7 @@ def plot_weight_effect(results_dir, save_path=None):
         100 * accuracies,
         linewidth=5.0,
         linestyle="dashdot",
-        label=fr"$\bar{{n}}_{{m}} \approx {int(round(average_n_train_samples * capacities_grid[round(len(capacities_grid)*0.5)], -2))}$"
+        label=fr"$\bar{{n}}_{{m}} \approx {int(round_to_nearest(average_n_train_samples * capacities_grid[round(len(capacities_grid)*0.5)]))}$"
     )
 
     accuracies = average_scores[:, round(len(capacities_grid)*0.75)] #[:, 25]
@@ -110,7 +113,7 @@ def plot_weight_effect(results_dir, save_path=None):
         100 * accuracies,
         linewidth=5.0,
         linestyle="dashed",
-        label=fr"$\bar{{n}}_{{m}} \approx {int(round(average_n_train_samples * capacities_grid[round(len(capacities_grid)*0.75)], -2))}$"
+        label=fr"$\bar{{n}}_{{m}} \approx {int(round_to_nearest(average_n_train_samples * capacities_grid[round(len(capacities_grid)*0.75)]))}$"
     )
 
     accuracies = average_scores[:, -1]
@@ -119,7 +122,7 @@ def plot_weight_effect(results_dir, save_path=None):
         100 * accuracies,
         linewidth=5.0,
         linestyle="dotted",
-        label=fr"$\bar{{n}}_{{m}} \approx {int(round(average_n_train_samples * capacities_grid[-1], -2))}$"
+        label=fr"$\bar{{n}}_{{m}} \approx {int(round_to_nearest(average_n_train_samples * capacities_grid[-1]))}$"
     )
 
     ax.grid(True, linewidth=2)

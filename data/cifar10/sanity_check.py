@@ -49,7 +49,7 @@ def sanity_check():
         print(f"\nSanity Check for {mode} data:")
         # Get all client folders and select 5 random clients
         client_folders = os.listdir(path)
-        random_clients = random.sample(client_folders, min(5, len(client_folders)))
+        random_clients = random.sample(client_folders, min(50, len(client_folders)))
 
         #for client_folder in os.listdir(path):
         for client_folder in random_clients:
@@ -82,21 +82,24 @@ def sanity_check():
             # Combine train and test labels to get the total unique labels for this client
             all_labels_set = train_labels_set.union(test_labels_set)
 
-            print(f" - Unique labels in training data: {sorted(train_labels_set)}")
-            print(f" - Unique labels in testing data: {sorted(test_labels_set)}")
-            print(f" - Total unique labels across train and test: {len(all_labels_set)}")
+            print(f" - Unique labels in training data: {sorted(train_labels_set)} (Total: {len(train_labels_set)})")
+            print(f" - Unique labels in testing data: {sorted(test_labels_set)} (Total: {len(test_labels_set)})")
+            if test_labels_set.issubset(train_labels_set):
+                print("All test labels are present in the train labels.")
+            else:
+                print("WARNING: Some test labels are not present in the train labels!!!")
 
 
             # Pick a random train and test sample for verification
-            if train_indices.size > 0:
-                random_train_idx = random.choice(train_indices)
-                train_embedding, train_label = get_data(random_train_idx)
-                print(f"   Random Train Sample: Index: {random_train_idx}, Embedding Shape: {train_embedding.shape}, Label: {train_label}")
+            # if train_indices.size > 0:
+            #     random_train_idx = random.choice(train_indices)
+            #     train_embedding, train_label = get_data(random_train_idx)
+            #     print(f"   Random Train Sample: Index: {random_train_idx}, Embedding Shape: {train_embedding.shape}, Label: {train_label}")
 
-            if test_indices.size > 0:
-                random_test_idx = random.choice(test_indices)
-                test_embedding, test_label = get_data(random_test_idx)
-                print(f"   Random Test Sample: Index: {random_test_idx}, Embedding Shape: {test_embedding.shape}, Label: {test_label}")
+            # if test_indices.size > 0:
+            #     random_test_idx = random.choice(test_indices)
+            #     test_embedding, test_label = get_data(random_test_idx)
+            #     print(f"   Random Test Sample: Index: {random_test_idx}, Embedding Shape: {test_embedding.shape}, Label: {test_label}")
 
 
 if __name__ == "__main__":

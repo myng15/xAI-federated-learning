@@ -111,7 +111,11 @@ def run(arguments_manager_):
         #Debug:
         print("Client's train labels: ", np.unique(client.train_labels), client.train_labels.shape, "; Client's test labels: ", np.unique(client.test_labels), client.test_labels.shape)
         
-        relevant_centroids, relevant_labels = aggregator.send_relevant_centroids(client.train_labels)
+        client_all_unique_labels = np.union1d(np.unique(client.train_labels), np.unique(client.test_labels))
+        #Debug:
+        #print("Client's all unique labels: ", client_all_unique_labels.shape, client_all_unique_labels)
+
+        relevant_centroids, relevant_labels = aggregator.send_relevant_centroids(np.unique(client.train_labels)) #aggregator.send_relevant_centroids(client_all_unique_labels)
         client.integrate_global_data(relevant_centroids, relevant_labels)
 
         # Evaluation

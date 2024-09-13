@@ -4,6 +4,7 @@ from learners.learner import *
 from models import *
 from datasets import *
 from data.cifar10.generate_data import load_embeddings as cifar10_load_embeddings
+from data.cifar100.generate_data import load_embeddings as cifar100_load_embeddings
 
 from .constants import *
 from .metrics import *
@@ -79,7 +80,10 @@ def get_loaders(type_, aggregator_, data_dir, batch_size, is_validation):
         else:
             inputs, targets = cifar10_load_embeddings()
     elif type_ == "cifar100":
-        inputs, targets = None #get_cifar100()
+        if aggregator_ == "centralized":
+            inputs, targets = get_cifar100()
+        else:
+            inputs, targets = cifar100_load_embeddings()
     else:
         inputs, targets = None, None
 

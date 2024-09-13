@@ -34,7 +34,7 @@ N_CLASSES = {
 }
 
 EMBEDDING_DIM = {
-    "cifar10": 1280,
+    "cifar10": 768, #1280,
     "cifar100": 1280,
     "femnist": 1280,
     "shakespeare": 1024
