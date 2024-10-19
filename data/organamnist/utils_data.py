@@ -87,24 +87,14 @@ def by_labels_non_iid_split(dataset, n_classes, n_clients, n_clusters, alpha, fr
     rng = random.Random(rng_seed)
     np.random.seed(rng_seed)
 
-    #Debug
-    print("n_classes: ", n_classes)
-    print("n_clusters: ", n_clusters)
-
     all_labels = list(range(n_classes))
     rng.shuffle(all_labels)
     clusters_labels = iid_divide(all_labels, n_clusters)
-
-    #Debug
-    print("clusters_labels: ", clusters_labels)
 
     label2cluster = dict()  # maps label to its cluster
     for group_idx, labels in enumerate(clusters_labels):
         for label in labels:
             label2cluster[label] = group_idx
-
-    #Debug
-    print("label2cluster: ", label2cluster)
 
     # get subset
     n_samples = int(len(dataset) * frac)
@@ -114,14 +104,10 @@ def by_labels_non_iid_split(dataset, n_classes, n_clients, n_clusters, alpha, fr
     clusters = {k: [] for k in range(n_clusters)}
     for idx in selected_indices:
         _, label = dataset[idx]
+
         group_id = label2cluster[label]
         clusters_sizes[group_id] += 1
         clusters[group_id].append(idx)
-
-        #Debug
-        if idx<10:
-            print("label: ", label)
-            print("group_id: ", group_id)
 
     for _, cluster in clusters.items():
         rng.shuffle(cluster)

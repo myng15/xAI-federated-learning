@@ -11,11 +11,11 @@ root = os.path.dirname(os.path.dirname(current))
 sys.path.append(root)
 
 from sklearn.model_selection import train_test_split
-from data.cifar10.utils_data import *
+from data.organamnist.utils_data import *
 
-RAW_DATA_PATH = os.path.join(root, "data/cifar10/database/")  #"data/cifar10/database/" 
-PATH = os.path.join(root, "data/cifar10/all_clients_data/") #"data/cifar10/all_clients_data/"
-N_CLASSES = 10
+RAW_DATA_PATH = os.path.join(root, "data/organamnist/database/")  
+PATH = os.path.join(root, "data/organamnist/all_clients_data/") 
+N_CLASSES = 11
 
 
 def save_data(data, path_):
@@ -25,7 +25,7 @@ def save_data(data, path_):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Splits CIFAR-10 embeddings among n_tasks. Default usage splits dataset in an IID fashion. '
+        description='Splits OrganAMNIST embeddings among n_tasks. Default usage splits dataset in an IID fashion. '
                     'Can be used with `pathological_split` or `by_labels_split` for different methods of non-IID splits.'
     )
     parser.add_argument(
@@ -113,14 +113,14 @@ def parse_args():
 
 
 def load_embeddings():
-    # Load CIFAR-10 embeddings and labels from the .npz files
+    # Load OrganAMNIST embeddings and labels from the .npz files
     train_data = np.load(os.path.join(RAW_DATA_PATH, 'train.npz'))
     test_data = np.load(os.path.join(RAW_DATA_PATH, 'test.npz'))
 
     train_embeddings = train_data['embeddings']
-    train_labels = train_data['labels']
+    train_labels = train_data['labels'].squeeze().astype(int) #TODO: add this to the shared generate_data.py file if using one generate_data.py file for all datasets
     test_embeddings = test_data['embeddings']
-    test_labels = test_data['labels']
+    test_labels = test_data['labels'].squeeze().astype(int)
 
     # Combine train and test embeddings and labels into a single dataset
     embeddings = np.concatenate([train_embeddings, test_embeddings], axis=0)
@@ -180,8 +180,8 @@ def main():
     for mode, clients_indices in [('train', train_clients_indices), ('test', test_clients_indices)]:
         for client_id, indices in enumerate(clients_indices):
             indices = np.array(indices)
-            train_indices = indices[indices < 50_000]  # Assuming first 50k are train embeddings
-            test_indices = indices[indices >= 50_000]  # Assuming remaining are test embeddings
+            train_indices = indices[indices < 41_052]  # Assuming first 41052 are train embeddings
+            test_indices = indices[indices >= 41_052]  # Assuming remaining are test embeddings
 
             if (len(train_indices) == 0) or (len(test_indices) == 0):
                 continue

@@ -11,10 +11,10 @@ root = os.path.dirname(os.path.dirname(current))
 sys.path.append(root)
 
 from sklearn.model_selection import train_test_split
-from data.cifar10.utils_data import *
+from data.mnist.utils_data import *
 
-RAW_DATA_PATH = os.path.join(root, "data/cifar10/database/")  #"data/cifar10/database/" 
-PATH = os.path.join(root, "data/cifar10/all_clients_data/") #"data/cifar10/all_clients_data/"
+RAW_DATA_PATH = os.path.join(root, "data/mnist/database/")  #"data/mnist/database/" 
+PATH = os.path.join(root, "data/mnist/all_clients_data/") #"data/mnist/all_clients_data/"
 N_CLASSES = 10
 
 
@@ -25,7 +25,7 @@ def save_data(data, path_):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Splits CIFAR-10 embeddings among n_tasks. Default usage splits dataset in an IID fashion. '
+        description='Splits MNIST embeddings among n_tasks. Default usage splits dataset in an IID fashion. '
                     'Can be used with `pathological_split` or `by_labels_split` for different methods of non-IID splits.'
     )
     parser.add_argument(
@@ -52,41 +52,23 @@ def parse_args():
             type=str,
             default="iid"
     )
-    # parser.add_argument(
-    #     '--pathological_split',
-    #     help='if selected, the dataset will be split as follow:'
-    #          '  1) sort the data by label'
-    #          '  2) divide it into `n_clients * n_classes_per_client` shards, of equal size.'
-    #          '  3) assign each of the `n_clients` with `n_classes_per_client` shards'
-    #          'Similar to "Communication-Efficient Learning of Deep Networks from Decentralized Data"'
-    #          '__(https://arxiv.org/abs/1602.05629);',
-    #     action='store_true'
-    # )
-    # parser.add_argument(
-    #     '--by_labels_split',
-    #     help='if selected, the dataset will be split as follow:'
-    #          '  1) classes are grouped into `n_clusters`'
-    #          '  2) for each cluster `c`, samples are partitioned across clients using dirichlet distribution'
-    #          'Inspired by "Federated Learning with Matched Averaging"__(https://arxiv.org/abs/2002.06440);',
-    #     action='store_true'
-    # )
     parser.add_argument(
         '--n_shards',
-        help='number of shards given to each clients/task; ignored if `pathological_split` is not used;'
+        help='number of shards given to each clients/task; ignored if `--pathological_split` is not used;'
              'default is 2',
         type=int,
         default=2
     )
     parser.add_argument(
         '--n_components',
-        help='number of components/clusters; ignored if `by_labels_split` is not used; default is -1',
+        help='number of components/clusters; ignored if `--by_labels_split` is not used; default is -1',
         type=int,
         default=-1
     )
     parser.add_argument(
         '--alpha',
         help='parameter controlling tasks dissimilarity, the smaller alpha is the more tasks are dissimilar;'
-             'ignored if `by_labels_split` is not used; default is 0.5',
+             'ignored if `--by_labels_split` is not used; default is 0.5',
         type=float,
         default=0.5
     )
@@ -113,7 +95,7 @@ def parse_args():
 
 
 def load_embeddings():
-    # Load CIFAR-10 embeddings and labels from the .npz files
+    # Load MNIST embeddings and labels from the .npz files
     train_data = np.load(os.path.join(RAW_DATA_PATH, 'train.npz'))
     test_data = np.load(os.path.join(RAW_DATA_PATH, 'test.npz'))
 
@@ -180,8 +162,8 @@ def main():
     for mode, clients_indices in [('train', train_clients_indices), ('test', test_clients_indices)]:
         for client_id, indices in enumerate(clients_indices):
             indices = np.array(indices)
-            train_indices = indices[indices < 50_000]  # Assuming first 50k are train embeddings
-            test_indices = indices[indices >= 50_000]  # Assuming remaining are test embeddings
+            train_indices = indices[indices < 60_000]  # Assuming first 60k are train embeddings
+            test_indices = indices[indices >= 60_000]  # Assuming remaining are test embeddings
 
             if (len(train_indices) == 0) or (len(test_indices) == 0):
                 continue
@@ -209,5 +191,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

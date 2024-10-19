@@ -1,4 +1,4 @@
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 from argparse import ArgumentParser
 from tqdm import tqdm
 
@@ -10,6 +10,17 @@ import numpy as np
 import timm
 import os
 
+import sys
+current = os.path.dirname(os.path.realpath(__file__))
+root = os.path.dirname(current)
+# adding the root directory to the sys.path.
+sys.path.append(root)
+
+from utils.utils import *
+
+import medmnist
+from medmnist import INFO
+
 
 def get_dataloaders(args, transforms):
     """
@@ -19,7 +30,6 @@ def get_dataloaders(args, transforms):
     :return data: Dictionary containing both train and test dataloaders.
     """
 
-    #data_path = os.path.join(args.dataset_root,args.dataset)
     data_path = args.dataset_root
 
     # convert img to RGB & append after ToTensor() 
@@ -40,6 +50,15 @@ def get_dataloaders(args, transforms):
         transforms.transforms.insert(-1, to_rgb)
         trainset = torchvision.datasets.FashionMNIST(root=data_path, train=True, download=True, transform=transforms)
         testset = torchvision.datasets.FashionMNIST(root=data_path, train=False, download=True, transform=transforms)
+    elif args.dataset == "organamnist" or args.dataset == "dermamnist":
+        info = INFO[args.dataset] 
+        DataClass = getattr(medmnist, info['python_class']) # get relative dataset class
+        trainset = DataClass(split='train', transform=transforms, download=False, as_rgb=True, size=224, root=data_path, mmap_mode='r')
+        valset = DataClass(split='val', transform=transforms, download=False, as_rgb=True, size=224, root=data_path, mmap_mode='r')
+        testset = DataClass(split='test', transform=transforms, download=False, as_rgb=True, size=224, root=data_path, mmap_mode='r')
+
+        # Concatenate train and val sets into a single training set
+        trainset = ConcatDataset([trainset, valset])
     else:
         raise ValueError(f"{args.dataset} not available")
     
@@ -66,7 +85,6 @@ def extract_embeddings(model, device, dataloader):
     embeddings_db, labels_db = [], []
 
     for extracted in tqdm(dataloader):
-
         images, labels = extracted
         images = images.to(device)
 
@@ -76,7 +94,6 @@ def extract_embeddings(model, device, dataloader):
         labels_db.extend(labels)
         embeddings_db.extend(output.detach().cpu().numpy())
     
-
     data = {
         'embeddings': embeddings_db,
         'labels': labels_db
@@ -85,9 +102,9 @@ def extract_embeddings(model, device, dataloader):
     return data
 
 
-
 def main(args):
-
+    seed_everything(args.seed)
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # get model from timm
@@ -113,7 +130,7 @@ def main(args):
                                  device = device,
                                  dataloader = dataloaders[split])
         
-        # store database: database_root / dataset / train|test.npz
+        # store database: database_root / train|test.npz
         np.savez(os.path.join(args.database_root,f'{split}.npz'), **db)
 
 
@@ -122,13 +139,14 @@ if __name__ == '__main__':
     parser = ArgumentParser()
 
     # GENERAL
-    parser.add_argument('--dataset_root', type=str, default="tmp/assets/data", help='define the dataset root')
-    parser.add_argument('--database_root', type=str, default="tmp/assets/database", help='define the database root')
+    parser.add_argument('--dataset_root', type=str, default="tmp/assets/dataset", help='define the dataset root') #e.g. dataset_root="data/cifar10/dataset/"
+    parser.add_argument('--database_root', type=str, default="tmp/assets/database", help='define the database root') #e.g. database_root="data/cifar10/database/"
 
     # DATASET & HYPERPARAMS
-    parser.add_argument('--dataset', type=str, required=True, help='define the dataset name') 
+    parser.add_argument('--dataset', type=str, required=True, help='define the dataset name') #e.g. dataset="cifar10"
     parser.add_argument('--backbone', type=str, default='vit_base_patch14_dinov2.lvd142m', help='define the feature extractor')
     parser.add_argument('--batch_size', type=int, default=128, help='define the batch size')
+    parser.add_argument('--seed', type=int, default=42, help='define the random seed')
 
     # ADD METHOD
     args = parser.parse_args()

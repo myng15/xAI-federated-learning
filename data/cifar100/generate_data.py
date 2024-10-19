@@ -5,11 +5,18 @@ import os
 import argparse
 import pickle
 
+import sys
+current = os.path.dirname(os.path.realpath(__file__))
+root = os.path.dirname(os.path.dirname(current))
+# adding the root directory to the sys.path.
+sys.path.append(root)
+
 from sklearn.model_selection import train_test_split
 from data.cifar100.utils_data import *
 
-RAW_DATA_PATH = "data/cifar100/database/" 
-PATH = "data/cifar100/all_clients_data/"
+RAW_DATA_PATH = os.path.join(root, "data/cifar100/database/")  #"data/cifar100/database/" 
+PATH = os.path.join(root, "data/cifar100/all_clients_data/") #"data/cifar100/all_clients_data/"
+
 
 N_FINE_LABELS = 100
 N_COARSE_LABELS = 20
@@ -37,11 +44,11 @@ def save_data(l, path_):
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Splits dataset among n_tasks. Default usage splits dataset in an IID fashion. Can be used with '
-                    '`--pathological_split`, `--by_labels_split` or `pachinko_allocation` for different methods '
+                    '`pathological_split`, `by_labels_split` or `pachinko_allocation` for different methods '
                     'of non-IID splits.'
-                    'In case if usage `--pathological_split`, `--by_labels_split` and `--pachinko_allocation`'
-                    'simultaneously, the order of preference is:'
-                    ' `--pachinko_allocation`, `--by_labels_split` then `--pathological_split`.'
+                    # 'In case if usage `pathological_split`, `by_labels_split` and `pachinko_allocation_split`'
+                    # 'simultaneously, the order of preference is:'
+                    # ' `pachinko_allocation`, `by_labels_split` then `pathological_split`.'
     )
     parser.add_argument(
         '--n_tasks',
@@ -49,55 +56,85 @@ def parse_args():
         type=int,
         required=True)
     parser.add_argument(
-        '--pachinko_allocation_split',
-        help='split classification dataset among `n_clients` using pachinko allocation.'
-             'This method works for datasets with coarse (super) labels, e.g. cifar-100.'
-             'The dataset is split as follow:'
-             '  1) Each client  has a symmetric Dirichlet distribution with parameter `alpha` over the coarse labels.'
-             '  2) Each coarse label has a symmetric Dirichlet distribution with parameter `beta` over its fine labels.'
-             '  3) To generate a sample for the client, we first select  a coarse label by drawing from the coarse'
-             '      label multinomial distribution, and then draw a fine label using the coarse-to-fine multinomial'
-             '      distribution. We then randomly draw a sample from CIFAR-100 with that label (without replacement).'
-             '  4) If this exhausts the set of samples with this label, we remove the label from the coarse-to-fine'
-             '      multinomial and re-normalize the multinomial distribution.'
-             'Implementation follows the description in'
-             ' "Adaptive Federated Optimization"__(https://arxiv.org/abs/2003.00295)',
-        action='store_true'
+            "--split_method",
+            help='method to be used to split data among n_tasks;'
+                 ' possible are "iid", "by_labels_split", "pathological_split" and "pachinko_allocation_split";'
+                 ' 1) "by_labels_split": the dataset will be split as follow:'
+                 '  a) classes are grouped into `n_clusters`'
+                 '  b) for each cluster `c`, samples are partitioned across clients using dirichlet distribution'
+                 ' Inspired by "Federated Learning with Matched Averaging"__(https://arxiv.org/abs/2002.06440);'
+                 ' 2) "pathological_split": the dataset will be split as follow:'
+                 '  a) sort the data by label'
+                 '  b) divide it into `n_clients * n_classes_per_client` shards, of equal size.'
+                 '  c) assign each of the `n_clients` with `n_classes_per_client` shards'
+                 ' Similar to "Communication-Efficient Learning of Deep Networks from Decentralized Data"'
+                 ' __(https://arxiv.org/abs/1602.05629);'
+                 ' 3) "pachinko_allocation_split": split classification dataset among `n_clients` using pachinko allocation.'
+                 ' This method works for datasets with coarse (super) labels, e.g. cifar-100.'
+                 ' The dataset is split as follow:'
+                 '  a) Each client  has a symmetric Dirichlet distribution with parameter `alpha` over the coarse labels.'
+                 '  b) Each coarse label has a symmetric Dirichlet distribution with parameter `beta` over its fine labels.'
+                 '  c) To generate a sample for the client, we first select  a coarse label by drawing from the coarse'
+                 '      label multinomial distribution, and then draw a fine label using the coarse-to-fine multinomial'
+                 '      distribution. We then randomly draw a sample from CIFAR-100 with that label (without replacement).'
+                 '  d) If this exhausts the set of samples with this label, we remove the label from the coarse-to-fine'
+                 '      multinomial and re-normalize the multinomial distribution.'
+                 ' Implementation follows the description in'
+                 ' "Adaptive Federated Optimization"__(https://arxiv.org/abs/2003.00295)'
+                 'default is "iid"',
+            type=str,
+            default="iid"
     )
-    parser.add_argument(
-        '--pathological_split',
-        help='if selected, the dataset will be split as follow:'
-             '  1) sort the data by label'
-             '  2) divide it into `n_clients * n_classes_per_client` shards, of equal size.'
-             '  3) assign each of the `n_clients` with `n_classes_per_client` shards'
-             'Similar to "Communication-Efficient Learning of Deep Networks from Decentralized Data"'
-             '__(https://arxiv.org/abs/1602.05629);',
-        action='store_true'
-    )
-    parser.add_argument(
-        '--by_labels_split',
-        help='if selected, the dataset will be split as follow:'
-             '  1) classes are grouped into `n_clusters`'
-             '  2) for each cluster `c`, samples are partitioned across clients using dirichlet distribution'
-             'Inspired by "Federated Learning with Matched Averaging"__(https://arxiv.org/abs/2002.06440);',
-        action='store_true'
-    )
+    # parser.add_argument(
+    #     '--pachinko_allocation_split',
+    #     help='split classification dataset among `n_clients` using pachinko allocation.'
+    #          'This method works for datasets with coarse (super) labels, e.g. cifar-100.'
+    #          'The dataset is split as follow:'
+    #          '  1) Each client  has a symmetric Dirichlet distribution with parameter `alpha` over the coarse labels.'
+    #          '  2) Each coarse label has a symmetric Dirichlet distribution with parameter `beta` over its fine labels.'
+    #          '  3) To generate a sample for the client, we first select  a coarse label by drawing from the coarse'
+    #          '      label multinomial distribution, and then draw a fine label using the coarse-to-fine multinomial'
+    #          '      distribution. We then randomly draw a sample from CIFAR-100 with that label (without replacement).'
+    #          '  4) If this exhausts the set of samples with this label, we remove the label from the coarse-to-fine'
+    #          '      multinomial and re-normalize the multinomial distribution.'
+    #          'Implementation follows the description in'
+    #          ' "Adaptive Federated Optimization"__(https://arxiv.org/abs/2003.00295)',
+    #     action='store_true'
+    # )
+    # parser.add_argument(
+    #     '--pathological_split',
+    #     help='if selected, the dataset will be split as follow:'
+    #          '  1) sort the data by label'
+    #          '  2) divide it into `n_clients * n_classes_per_client` shards, of equal size.'
+    #          '  3) assign each of the `n_clients` with `n_classes_per_client` shards'
+    #          'Similar to "Communication-Efficient Learning of Deep Networks from Decentralized Data"'
+    #          '__(https://arxiv.org/abs/1602.05629);',
+    #     action='store_true'
+    # )
+    # parser.add_argument(
+    #     '--by_labels_split',
+    #     help='if selected, the dataset will be split as follow:'
+    #          '  1) classes are grouped into `n_clusters`'
+    #          '  2) for each cluster `c`, samples are partitioned across clients using dirichlet distribution'
+    #          'Inspired by "Federated Learning with Matched Averaging"__(https://arxiv.org/abs/2002.06440);',
+    #     action='store_true'
+    # )
     parser.add_argument(
         '--n_shards',
-        help='number of shards given to each clients/task; ignored if `--pathological_split` is not used;'
+        help='number of shards given to each clients/task; ignored if `pathological_split` is not used;'
              'default is 2',
         type=int,
         default=2
     )
     parser.add_argument(
         '--n_components',
-        help='number of components/clusters; ignored if `--by_labels_split` is not used; default is -1',
+        help='number of components/clusters; ignored if `by_labels_split` is not used; default is -1',
         type=int,
         default=-1)
     parser.add_argument(
         '--alpha',
         help='parameter controlling tasks dissimilarity, the smaller alpha is the more tasks are dissimilar;'
-             'ignored if `--by_labels_split` is not used; default is 0.5',
+             'ignored if `by_labels_split` is not used; default is 0.5',
         type=float,
         default=0.5)
     parser.add_argument(
@@ -153,12 +190,8 @@ def main():
     embeddings, labels = load_embeddings()
 
     dataset = list(zip(embeddings, labels))  # Combine embeddings and labels into a list of tuples
-    #Debug:
-    print("args.pathological_split: ", args.pathological_split)
-    print("args.by_labels_split: ", args.by_labels_split)
-    print("args.pachinko_allocation_split: ", args.pachinko_allocation_split)
-
-    if args.pathological_split:
+    
+    if args.split_method == "pathological_split":
         clients_indices =\
             pathological_non_iid_split(
                 dataset=dataset,
@@ -168,7 +201,7 @@ def main():
                 frac=args.s_frac,
                 seed=args.seed)
 
-    elif args.by_labels_split:
+    elif args.split_method == "by_labels_split":
         clients_indices = \
             by_labels_non_iid_split(
                 dataset=dataset,
@@ -179,7 +212,7 @@ def main():
                 frac=args.s_frac,
                 seed=args.seed
             )
-    elif args.pachinko_allocation_split:
+    elif args.split_method == "pachinko_allocation_split":
         clients_indices = \
             pachinko_allocation_split(
                 dataset=dataset,
@@ -192,7 +225,7 @@ def main():
                 frac=args.s_frac,
                 seed=args.seed
             )
-    else:
+    else: #args.split_method == "iid"
         clients_indices = \
             iid_split(
                 dataset=dataset,
@@ -222,12 +255,26 @@ def main():
 
             if (len(train_indices) == 0) or (len(test_indices) == 0):
                 continue
-                
+            
+
+            # HANDLE ISSUE OF MISSING TEST LABELS IN TRAIN LABELS:
+            # Get labels for the training and testing data
+            train_labels = labels[train_indices]
+            test_labels = labels[test_indices]
+
+            # Filter out test samples whose labels are not present in the training set
+            valid_test_indices = test_indices[np.isin(test_labels, train_labels)]
+
+
+            # Save train and test indices for each client
             client_path = os.path.join(PATH, mode, "task_{}".format(client_id))
             os.makedirs(client_path, exist_ok=True)
 
             save_data(train_indices, os.path.join(client_path, "train.pkl"))
-            save_data(test_indices, os.path.join(client_path, "test.pkl"))
+            save_data(valid_test_indices, os.path.join(client_path, "test.pkl"))
+
+            if len(valid_test_indices) < len(test_indices):
+                print(f"Client task_{client_id}: Filtered out {len(test_indices) - len(valid_test_indices)} test samples due to missing train labels.")
 
 
 if __name__ == "__main__":
