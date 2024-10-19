@@ -107,7 +107,6 @@ class NextCharacterLSTM(nn.Module):
 
         return output, (hidden, cell)
 
-
 def get_mobilenet(n_classes, pretrained=True):
     """
     creates MobileNet model with `n_classes` outputs

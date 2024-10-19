@@ -6,14 +6,18 @@ ALL_STRATEGIES = {
 }
 
 ALL_MODELS = {
-    "mobilenet"
+    "mobilenet",
+    "linear"
 }
 
 LOADER_TYPE = {
     "synthetic": "tabular",
     "cifar10": "cifar10",
     "cifar100": "cifar100",
+    "mnist": "mnist",
     "femnist": "femnist",
+    "organamnist": "organamnist",
+    "dermamnist": "dermamnist",
     "shakespeare": "shakespeare"
 }
 
@@ -21,7 +25,10 @@ EXTENSIONS = {
     "tabular": ".pkl",
     "cifar10": ".pkl",
     "cifar100": ".pkl",
+    "mnist": ".pkl",
     "femnist": ".pt",
+    "organamnist": ".pkl",
+    "dermamnist": ".pkl",
     "shakespeare": ".txt"
 }
 
@@ -29,14 +36,20 @@ N_CLASSES = {
     "synthetic": 1,
     "cifar10": 10,
     "cifar100": 100,
+    "mnist": 10,
     "femnist": 62,
+    "organamnist": 11,
+    "dermamnist": 7,
     "shakespeare": 100
 }
 
 EMBEDDING_DIM = {
-    "cifar10": 768, #1280,
-    "cifar100": 1280,
-    "femnist": 1280,
+    "cifar10": 768, 
+    "cifar100": 768, 
+    "mnist": 768,
+    "femnist": 768, 
+    "organamnist": 768,
+    "dermamnist": 768,
     "shakespeare": 1024
 }
 

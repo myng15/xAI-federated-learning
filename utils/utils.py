@@ -5,15 +5,32 @@ from models import *
 from datasets import *
 from data.cifar10.generate_data import load_embeddings as cifar10_load_embeddings
 from data.cifar100.generate_data import load_embeddings as cifar100_load_embeddings
+from data.mnist.generate_data import load_embeddings as mnist_load_embeddings
+from data.organamnist.generate_data import load_embeddings as organamnist_load_embeddings
+from data.dermamnist.generate_data import load_embeddings as dermamnist_load_embeddings
 
 from .constants import *
 from .metrics import *
 from .optim import *
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import torch.nn as nn
 
 from tqdm import tqdm
+
+
+def seed_everything(seed=42):
+    """
+    Ensure reproducibility.
+    :param seed: Integer defining the seed number.
+    """
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def get_data_dir(experiment_name):
@@ -41,10 +58,12 @@ def get_loader(type_, aggregator_, path, batch_size, train, inputs=None, targets
     """
     #if type_ == "tabular":
     #    dataset = TabularDataset(path)
-    if type_ == "cifar10":
+    if type_ == "cifar10": 
         dataset = SubCIFAR10(path, aggregator_, cifar10_data=inputs, cifar10_targets=targets) #aggregator_: added argument to accommodate embedding databases as input in non-parametric mode (parametric mode such as FedAvg requires raw image datasets as input)
     elif type_ == "cifar100":
         dataset = SubCIFAR100(path, aggregator_, cifar100_data=inputs, cifar100_targets=targets) #aggregator_: added argument to accommodate embedding databases as input in non-parametric mode (parametric mode such as FedAvg requires raw image datasets as input)
+    elif type_ == "mnist" or type_ == "organamnist" or type_ == "dermamnist": # TODO: change this to type_ in ["mnist", ...]
+        dataset = SubMNIST(path, aggregator_, mnist_data=inputs, mnist_targets=targets) #aggregator_: added argument to accommodate embedding databases as input in non-parametric mode (parametric mode such as FedAvg requires raw image datasets as input)
     elif type_ == "femnist":
         dataset = SubFEMNIST(path)
     #elif type_ == "shakespeare":
@@ -84,6 +103,21 @@ def get_loaders(type_, aggregator_, data_dir, batch_size, is_validation):
             inputs, targets = get_cifar100()
         else:
             inputs, targets = cifar100_load_embeddings()
+    elif type_ == "mnist": # TODO Check all these following similar conditions, or combine to just one condition
+        if aggregator_ == "centralized":
+            inputs, targets = get_mnist() 
+        else:
+            inputs, targets = mnist_load_embeddings()
+    elif type_ == "organamnist":
+        if aggregator_ == "centralized":
+            inputs, targets = None 
+        else:
+            inputs, targets = organamnist_load_embeddings()
+    elif type_ == "dermamnist":
+        if aggregator_ == "centralized":
+            inputs, targets = None 
+        else:
+            inputs, targets = dermamnist_load_embeddings()
     else:
         inputs, targets = None, None
 
@@ -114,10 +148,7 @@ def get_loaders(type_, aggregator_, data_dir, batch_size, is_validation):
                 train=False
             )
 
-        if is_validation:
-            test_set = "val"
-        else:
-            test_set = "test"
+        test_set = "val" if is_validation else "test"
 
         test_iterator = \
             get_loader(
@@ -161,19 +192,56 @@ def get_model(name, model_name, device, input_dimension=None, hidden_dimension=N
             hidden_dimension=hidden_dimension,
             output_dimension=1
         )
-    elif name == "cifar10":
+    elif name == "cifar10" or name == "mnist": #TODO: Put all experiment names except "synthetic" (and "shakespeare") into 1 case with n_classes=N_CLASSES[name]
         if model_name == "mobilenet":
             model = get_mobilenet(n_classes=10, pretrained=True)
+        elif model_name == "linear":
+            model = LinearLayer(
+                input_dimension=input_dimension,
+                num_classes=10
+            )
         else:
             error_message = f"{model_name } is not a possible arrival process, available are:"
             for model_name_ in ALL_MODELS:
                 error_message += f" `{model_name_};`"
 
             raise NotImplementedError(error_message)
+    elif name == "organamnist":
+        if model_name == "mobilenet":
+            model = get_mobilenet(n_classes=11, pretrained=True)
+        elif model_name == "linear":
+            model = LinearLayer(
+                input_dimension=input_dimension,
+                num_classes=11
+            )
+        else:
+            error_message = f"{model_name} is not a possible model, available are:"
+            for model_name_ in ALL_MODELS:
+                error_message += f" `{model_name_};`"
 
+            raise NotImplementedError(error_message)
+    elif name == "dermamnist":
+        if model_name == "mobilenet":
+            model = get_mobilenet(n_classes=7, pretrained=True)
+        elif model_name == "linear":
+            model = LinearLayer(
+                input_dimension=input_dimension,
+                num_classes=7
+            )
+        else:
+            error_message = f"{model_name} is not a possible model, available are:"
+            for model_name_ in ALL_MODELS:
+                error_message += f" `{model_name_};`"
+
+            raise NotImplementedError(error_message)
     elif name == "cifar100":
         if model_name == "mobilenet":
             model = get_mobilenet(n_classes=100, pretrained=True)
+        elif model_name == "linear":
+            model = LinearLayer(
+                input_dimension=input_dimension,
+                num_classes=100
+            )
         else:
             error_message = f"{model_name} is not a possible model, available are:"
             for model_name_ in ALL_MODELS:
@@ -183,6 +251,11 @@ def get_model(name, model_name, device, input_dimension=None, hidden_dimension=N
     elif name == "femnist":
         if model_name == "mobilenet":
             model = get_mobilenet(n_classes=62, pretrained=True)
+        elif model_name == "linear":
+            model = LinearLayer(
+                input_dimension=input_dimension,
+                num_classes=62
+            )
         else:
             error_message = f"{model_name} is not a possible arrival process, available are:"
             for model_name_ in ALL_MODELS:
@@ -201,7 +274,7 @@ def get_model(name, model_name, device, input_dimension=None, hidden_dimension=N
     else:
         raise NotImplementedError(
             f"{name} is not available!"
-            f" Possible are: `cifar10`, `cifar100`, `emnist`, `femnist` and `shakespeare`."
+            f" Possible are: `cifar10`, `cifar100`, `mnist`, `emnist`, `femnist` and `shakespeare`."
         )
 
     if chkpts_path is not None:
@@ -308,7 +381,7 @@ def get_learner(
     constructs the learner corresponding to an experiment for a given seed
 
     :param name: name of the experiment to be used; possible are
-            {`synthetic`, `cifar10`, `emnist`, `shakespeare`}
+            {`synthetic`, `cifar10`, `mnist`, `femnist`, `shakespeare`}
 
     :param model_name: the name of the model to be used, only used when experiment is CIFAR-10, CIFAR-100 or FEMNIST
             possible are mobilenet and resnet
@@ -348,6 +421,10 @@ def get_learner(
         metric = accuracy
         is_binary_classification = False
     elif name == "cifar100":
+        criterion = nn.CrossEntropyLoss(reduction="none").to(device)
+        metric = accuracy
+        is_binary_classification = False
+    elif name == "mnist" or name == "organamnist" or name == "dermamnist": #TODO: Put all multi-class experiments to 1 case
         criterion = nn.CrossEntropyLoss(reduction="none").to(device)
         metric = accuracy
         is_binary_classification = False
@@ -392,27 +469,27 @@ def get_learner(
             n_rounds=n_rounds
         )
 
-    if name == "shakespeare":
-        return LanguageModelingLearner(
-            model=model,
-            criterion=criterion,
-            metric=metric,
-            device=device,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            is_binary_classification=is_binary_classification
-        )
-    else:
-        return Learner(
-            model=model,
-            model_name=model_name,
-            criterion=criterion,
-            metric=metric,
-            device=device,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            is_binary_classification=is_binary_classification
-        )
+    # if name == "shakespeare":
+    #     return LanguageModelingLearner(
+    #         model=model,
+    #         criterion=criterion,
+    #         metric=metric,
+    #         device=device,
+    #         optimizer=optimizer,
+    #         lr_scheduler=lr_scheduler,
+    #         is_binary_classification=is_binary_classification
+    #     )
+    # else:
+    return Learner(
+        model=model,
+        model_name=model_name,
+        criterion=criterion,
+        metric=metric,
+        device=device,
+        optimizer=optimizer,
+        lr_scheduler=lr_scheduler,
+        is_binary_classification=is_binary_classification
+    )
 
 
 def get_aggregator(
@@ -456,7 +533,7 @@ def get_aggregator(
             verbose=verbose,
             seed=seed
         )
-    elif aggregator_type == "centralized":
+    elif aggregator_type == "centralized" or aggregator_type == "centralized_linear": 
         return CentralizedAggregator(
             clients=clients,
             global_learner=global_learner,

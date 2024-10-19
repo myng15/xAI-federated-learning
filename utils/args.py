@@ -20,15 +20,27 @@ class ArgumentsManager(ABC):
         self.parser.add_argument(
             'experiment',
             help='name of experiment, possible are:'
-                 '{"cifar10", "cifar100", "femnist", "shakespeare"}',
+                 '{"cifar10", "cifar100", "femnist", "mnist", "organamnist", "dermamnist", "shakespeare"}',
             type=str
         )
         self.parser.add_argument(
             '--model_name',
             help='the name of the model to be used, only used when experiment is CIFAR-10, CIFAR-100 or FEMNIST'
-                 'possible are {"mobilenet"}, default is mobilenet',
+                 'possible are {"mobilenet", "linear"}, default is mobilenet',
             type=str,
             default="mobilenet"
+        )
+        self.parser.add_argument(
+            '--aggregator_type',
+            help='aggregator type; possible are "centralized", "centralized_linear", "cluster_centroids"', # TODO: Update descriptions (given options) of all args if needed
+            type=str,
+            default="centralized"
+        )
+        self.parser.add_argument(
+            '--val_frac',
+            help='fraction of each client\'s train dataset used for validation; default=0.2',
+            type=float,
+            default=0.2
         )
         self.parser.add_argument(
             '--bz',
@@ -60,6 +72,11 @@ class ArgumentsManager(ABC):
             type=int,
             default=argparse.SUPPRESS
         )
+        self.parser.add_argument(
+            "--results_dir",
+            help='directory to save the results; if not passed, it is set using arguments',
+            default=argparse.SUPPRESS
+        )
 
     def parse_arguments(self, args_list=None):
         if args_list:
@@ -84,12 +101,12 @@ class TrainArgumentsManager(ArgumentsManager):
     def __init__(self):
         super(TrainArgumentsManager, self).__init__()
 
-        self.parser.add_argument(
-            '--aggregator_type',
-            help='aggregator type; possible are "centralized"',
-            type=str,
-            default="centralized"
-        )
+        # self.parser.add_argument(
+        #     '--aggregator_type',
+        #     help='aggregator type; possible are "centralized", "centralized_linear", "cluster_centroids"', # TODO: Update descriptions (given options) of all args if needed
+        #     type=str,
+        #     default="centralized"
+        # )
         self.parser.add_argument(
             '--client_type',
             help='client type; possible are "normal", "per-fedavg" and "fedrep"; default is "normal"',
@@ -119,6 +136,12 @@ class TrainArgumentsManager(ArgumentsManager):
             help='frequency of writing logs; defaults is 1',
             type=int,
             default=1
+        )
+        self.parser.add_argument(
+            '--eval_freq',
+            help='frequency of logging client evaluation results; defaults is 99999 (i.e. only once before and once after training)',
+            type=int,
+            default=99999
         )
         self.parser.add_argument(
             '--optimizer',
@@ -231,16 +254,24 @@ class TestArgumentsManager(ArgumentsManager):
             type=float
         )
         self.parser.add_argument(
-            '--kernel_length_scale',
+            '--knn_weights',
+            help='the method of weighing knn outputs;'
+                 'possible are "inverse_distances" and "gaussian_kernel"' 
+                 'default=gaussian_kernel',
+            type=str,
+            default="gaussian_kernel"
+        )
+        self.parser.add_argument(
+            '--gaussian_kernel_scale',
             help='the length scale of kernel; default=1.0',
             type=float,
             default=1.0
         )
-        self.parser.add_argument(
-            "--results_dir",
-            help='directory to save the results; if not passed, it is set using arguments',
-            default=argparse.SUPPRESS
-        )
+        # self.parser.add_argument(
+        #     "--results_dir",
+        #     help='directory to save the results; if not passed, it is set using arguments',
+        #     default=argparse.SUPPRESS
+        # )
         self.parser.add_argument(
             "--verbose",
             help='verbosity level, `0` to quiet, `1` to show samples statistics;',
@@ -283,11 +314,11 @@ class PlotsArgumentsManager(ArgumentsManager):
                  '`weights_grid.npy` abd `capacities_grid.npy`;',
             type=str
         )
-        self.parser.add_argument(
-            '--save_path',
-            help='path to save the plots',
-            type=str
-        )
+        # self.parser.add_argument(
+        #     '--save_path',
+        #     help='path to save the plots',
+        #     type=str
+        # )
 
     def args_to_string(self):
         pass
