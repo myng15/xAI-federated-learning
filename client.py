@@ -401,6 +401,7 @@ class KNNClusterCentroidsClient(Client):
             self, 
             learner,
             train_iterator, 
+            val_iterator,
             test_iterator, 
             logger, 
             k,
@@ -410,13 +411,15 @@ class KNNClusterCentroidsClient(Client):
             capacity, 
             strategy, 
             rng, 
+            knn_weights,
+            gaussian_kernel_scale,
             *args, 
             **kwargs
     ):
         super(KNNClusterCentroidsClient, self).__init__(
             learner=learner,
             train_iterator=train_iterator,
-            val_iterator=None,  # Assuming validation iterator is not needed here
+            val_iterator=val_iterator,  
             test_iterator=test_iterator,
             logger=logger,
             local_steps=None,  # Adjust if local steps are needed
@@ -425,15 +428,19 @@ class KNNClusterCentroidsClient(Client):
         )
 
         self.k = k
-
         self.n_clusters = n_clusters
+        self.knn_weights = knn_weights
+        self.gaussian_kernel_scale = gaussian_kernel_scale
+
         self.features_dimension = features_dimension
         self.num_classes = num_classes
 
         self.train_iterator = train_iterator
+        self.val_iterator = val_iterator
         self.test_iterator = test_iterator
 
         self.n_train_samples = len(train_iterator.dataset)
+        self.n_val_samples = len(val_iterator.dataset)
         self.n_test_samples = len(test_iterator.dataset)
 
         self.capacity = capacity
@@ -451,6 +458,8 @@ class KNNClusterCentroidsClient(Client):
         # Initialize local training data
         self.train_features = np.zeros(shape=(self.n_train_samples, self.features_dimension), dtype=np.float32)
         self.train_labels = np.zeros(shape=self.n_train_samples, dtype=np.int64)
+        self.val_features = np.zeros(shape=(self.n_val_samples, self.features_dimension), dtype=np.float32)
+        self.val_labels = np.zeros(shape=self.n_val_samples, dtype=np.int64)
         self.test_features = np.zeros(shape=(self.n_test_samples, self.features_dimension), dtype=np.float32)
         self.test_labels = np.zeros(shape=self.n_test_samples, dtype=np.int64)
 
@@ -485,40 +494,44 @@ class KNNClusterCentroidsClient(Client):
         self.__capacity = capacity
 
     def load_all_features_and_labels(self):
-        start_index = 0
+        # Load train data
+        train_features_list = []
+        train_labels_list = []
+        
         for batch_features, batch_labels, _ in self.train_iterator:
-            batch_size = batch_features.shape[0]
-            end_index = start_index + batch_size
-            
-            # Copy data from PyTorch tensors to numpy arrays
-            self.train_features[start_index:end_index] = batch_features.numpy()
-            self.train_labels[start_index:end_index] = batch_labels.numpy()
+            train_features_list.append(batch_features.numpy())
+            train_labels_list.append(batch_labels.numpy())
 
-            start_index += batch_size
+        self.train_features = np.concatenate(train_features_list, axis=0)
+        self.train_labels = np.concatenate(train_labels_list, axis=0)
 
-        start_index = 0
+        # Load validation data
+        val_features_list = []
+        val_labels_list = []
+
+        for batch_features, batch_labels, _ in self.val_iterator:
+            val_features_list.append(batch_features.numpy())
+            val_labels_list.append(batch_labels.numpy())
+
+        self.val_features = np.concatenate(val_features_list, axis=0)
+        self.val_labels = np.concatenate(val_labels_list, axis=0)
+
+        # Load test data
+        test_features_list = []
+        test_labels_list = []
+
         for batch_features, batch_labels, _ in self.test_iterator:
-            batch_size = batch_features.shape[0]
-            end_index = start_index + batch_size
-            
-            # Copy data from PyTorch tensors to numpy arrays
-            self.test_features[start_index:end_index] = batch_features.numpy()
-            self.test_labels[start_index:end_index] = batch_labels.numpy()
+            test_features_list.append(batch_features.numpy())
+            test_labels_list.append(batch_labels.numpy())
 
-            start_index += batch_size
+        self.test_features = np.concatenate(test_features_list, axis=0)
+        self.test_labels = np.concatenate(test_labels_list, axis=0)
 
     def build_datastore(self):
         self.datastore_flag = True
-
-        #Debug
-        print("self.datastore.capacity in build_datastore(): ", self.datastore.capacity)
-
         self.datastore.build(self.train_features, self.train_labels)
 
     def compute_local_centroids(self):
-        #Debug
-        #print("Train features for KMeans: ", "Shape: ", self.train_features.shape, " | ", self.train_features[0:10])
-
         kmeans = KMeans(n_clusters=self.n_clusters, random_state=1234)
         kmeans.fit(self.train_features)
         centroids = kmeans.cluster_centers_
@@ -526,17 +539,9 @@ class KNNClusterCentroidsClient(Client):
         return centroids, labels
 
     def integrate_global_data(self, global_centroids, global_labels):
-        #Debug
-        #print("global_centroids: ", type(global_centroids), global_centroids.shape)
-        #print("global_labels: ", type(global_labels), global_labels.shape)
-
-        #print("self.global_labels before: ", type(self.global_labels), self.global_labels.shape)
-
         self.faiss_index = IndexFlatL2(self.features_dimension)
         self.faiss_index.add(global_centroids)
         self.global_labels = np.concatenate([self.global_labels, global_labels])
-
-        #print("self.global_labels after: ", type(self.global_labels), self.global_labels.shape)
 
     def compute_knn_outputs(self, features, scope="local", scale=1., method="gaussian_kernel"):
             """
@@ -556,9 +561,6 @@ class KNNClusterCentroidsClient(Client):
 
                 assert self.datastore_flag, "Should build local datastore before computing knn outputs!"
 
-                #Debug
-                print("self.datastore.capacity in compute_knn_outputs(): ", self.datastore.capacity)
-    
                 distances, indices = self.datastore.index.search(features, self.k)
                 if method == "inverse_distances":
                     knn_outputs = self._compute_weighted_outputs(distances, indices)
@@ -594,24 +596,14 @@ class KNNClusterCentroidsClient(Client):
         # weights of each nearest neighbor in the train dataset to a certain test feature (w.r.t. their distances from this test feature)
         weights = 1. / (distances + 1e-8)  # Avoid division by zero 
 
-        #Debug:
-        #print("weights for computing weighted outputs: ", weights, weights.shape, "; - distances: ", distances.shape)
-
         knn_outputs = np.zeros((weights.shape[0], self.num_classes), dtype=np.float32) #knn_outputs: (n_test_samples,n_classes); weights: (n_test_samples, k)
         for i in range(weights.shape[0]): # for each test feature
             weighted_sum = np.zeros(self.num_classes, dtype=np.float32)
-
-            # Debug:
-            #print("weighted_sum: ", weighted_sum, weighted_sum.shape)     #weighted_sum: (10,)
 
             for j in range(weights.shape[1]): # for each neighbor of the test feature
                 class_label = labels[indices[i, j]]
                 weighted_sum[class_label] += weights[i, j]
             knn_outputs[i] = weighted_sum / weights[i].sum()
-
-        #Debug
-        #print("labels: ", labels.shape, labels)
-        #print("knn_outputs: ", knn_outputs.shape)
 
         return knn_outputs
 
@@ -630,25 +622,24 @@ class KNNClusterCentroidsClient(Client):
             masks[class_id] = neighbors_labels == class_id
 
         knn_outputs = (similarities * masks).sum(axis=2) / similarities.sum(axis=1)
-
         return knn_outputs.T
 
-    def evaluate(self, weight):
+    def evaluate(self, weight, val_mode):
         """
         Evaluates the client for a given weight parameter.
 
         :param weight: float in [0, 1]
         :return: accuracy score
         """
-        self.local_knn_outputs = self.compute_knn_outputs(self.test_features, scope="local", scale=1., method="gaussian_kernel")
-        self.global_knn_outputs = self.compute_knn_outputs(self.test_features, scope="global", scale=1., method="gaussian_kernel")
-        #Debug
-        #print("local_knn_outputs: ", "|", self.local_knn_outputs)
-        #print("global_knn_outputs: ", "|", self.global_knn_outputs) 
+        features = self.val_features if val_mode else self.test_features
+        if val_mode:
+            self.local_knn_outputs = np.zeros(shape=(self.n_val_samples, self.num_classes), dtype=np.float32)
+            self.global_knn_outputs = np.zeros(shape=(self.n_val_samples, self.num_classes), dtype=np.float32)
+        
+        self.local_knn_outputs = self.compute_knn_outputs(features, scope="local", scale=self.gaussian_kernel_scale, method=self.knn_weights)
+        self.global_knn_outputs = self.compute_knn_outputs(features, scope="global", scale=self.gaussian_kernel_scale, method=self.knn_weights)
 
-        labels = self.test_labels
-        #Debug
-        #print("test labels: ", labels)
+        labels = self.val_labels if val_mode else self.test_labels 
 
         if self.local_knn_outputs_flag and self.global_knn_outputs_flag:
             outputs = weight * self.local_knn_outputs + (1 - weight) * self.global_knn_outputs
@@ -664,11 +655,6 @@ class KNNClusterCentroidsClient(Client):
         total = len(labels)
 
         acc = correct / total if total > 0 else 1.0
-
-        #Debug
-        print("predictions: ", predictions.shape)
-        print("correct: ", correct)
-
         return acc
 
     def clear_datastore(self):

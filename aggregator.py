@@ -178,6 +178,9 @@ class Aggregator(ABC):
             total_n_samples = 0
             total_n_test_samples = 0
 
+            train_accuracies = []
+            test_accuracies = []
+
             for client_id, client in enumerate(clients):
 
                 train_loss, train_acc, test_loss, test_acc = client.write_logs()
@@ -185,8 +188,8 @@ class Aggregator(ABC):
                 if self.verbose > 1:
                     print("*" * 30)
                     print(f"Client {client_id}..")
-                    print(f"Train Loss: {train_loss:.3f} | Train Acc: {train_acc * 100:.3f}%|", end="")
-                    print(f"Test Loss: {test_loss:.3f} | Test Acc: {test_acc * 100:.3f}% |")
+                    print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc * 100:.4f}%|", end="")
+                    print(f"Test Loss: {test_loss:.4f} | Test Acc: {test_acc * 100:.4f}% |")
 
                 global_train_loss += train_loss * client.n_train_samples
                 global_train_acc += train_acc * client.n_train_samples
@@ -196,16 +199,24 @@ class Aggregator(ABC):
                 total_n_samples += client.n_train_samples
                 total_n_test_samples += client.n_test_samples
 
+                train_accuracies.append(train_acc)
+                test_accuracies.append(test_acc)
+
             global_train_loss /= total_n_samples
             global_test_loss /= total_n_test_samples
             global_train_acc /= total_n_samples
             global_test_acc /= total_n_test_samples
 
+            # Calculate unweighted mean and standard deviations for train and test accuracies
+            train_acc_mean, train_acc_std = np.mean(train_accuracies), np.std(train_accuracies)
+            test_acc_mean, test_acc_std = np.mean(test_accuracies), np.std(test_accuracies)
+
             if self.verbose > 0:
                 print("+" * 30)
                 print("Global..")
-                print(f"Train Loss: {global_train_loss:.3f} | Train Acc: {global_train_acc * 100:.3f}% |", end="")
-                print(f"Test Loss: {global_test_loss:.3f} | Test Acc: {global_test_acc * 100:.3f}% |")
+                print(f"Train Loss: {global_train_loss:.4f} | Train Acc: {global_train_acc * 100:.4f}% |", end="")
+                print(f"Test Loss: {global_test_loss:.4f} | Test Acc: {global_test_acc * 100:.4f}% |")
+                print(f"Train Acc Mean/Std: {train_acc_mean * 100:.4f}%/{train_acc_std * 100:.4f}% | Test Acc Mean/Std: {test_acc_mean * 100:.4f}%/{test_acc_std * 100:.4f}% |")
                 print("+" * 50)
 
             global_logger.add_scalar("Train/Loss", global_train_loss, self.c_round)
@@ -216,6 +227,7 @@ class Aggregator(ABC):
         if self.verbose > 0:
             print("#" * 80)
 
+    # TODO: currently not used, check if useful somewhere
     def evaluate(self):
         """
         evaluate the aggregator, returns the performance of every client in the aggregator
